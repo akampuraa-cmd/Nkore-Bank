@@ -30,6 +30,6 @@ type InterestRate struct {
 	ProductType   string
 	Rate          decimal.Decimal
 	EffectiveFrom time.Time
-	EffectiveTo   time.Time
+	EffectiveTo   *time.Time
 	CreatedAt     time.Time
 }
