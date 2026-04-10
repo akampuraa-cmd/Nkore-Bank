@@ -68,7 +68,7 @@ func MustLoad() *Config {
 	if cfg.AESEncryptionKey == "" {
 		missing = append(missing, "AES_ENCRYPTION_KEY")
 	}
-	if cfg.DatabaseURL == "" {
+	if os.Getenv("DATABASE_URL") == "" {
 		missing = append(missing, "DATABASE_URL")
 	}
 

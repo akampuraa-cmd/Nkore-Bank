@@ -17,7 +17,8 @@ type DB struct {
 }
 
 // New opens a PostgreSQL connection pool and configures its limits.
-func New(databaseURL string) (*DB, error) {
+// The provided context controls the initial connectivity check timeout.
+func New(ctx context.Context, databaseURL string) (*DB, error) {
 	pool, err := sql.Open("postgres", databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("database: open: %w", err)
@@ -28,7 +29,7 @@ func New(databaseURL string) (*DB, error) {
 	pool.SetConnMaxLifetime(5 * time.Minute)
 	pool.SetConnMaxIdleTime(1 * time.Minute)
 
-	if err := pool.PingContext(context.Background()); err != nil {
+	if err := pool.PingContext(ctx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("database: ping: %w", err)
 	}
