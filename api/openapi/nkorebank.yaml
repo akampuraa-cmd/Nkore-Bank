@@ -1,0 +1,1345 @@
+openapi: 3.0.3
+info:
+  title: Nkore Bank Core Banking API
+  version: "1.0.0"
+  description: |
+    Nkore Bank is a premium core banking platform providing comprehensive
+    banking services including account management, transaction processing,
+    double-entry general ledger, AML compliance monitoring, and interest
+    accrual. All monetary amounts are represented as strings to avoid
+    floating-point precision issues.
+  contact:
+    name: Nkore Bank Engineering
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Accounts
+    description: Account lifecycle management
+  - name: Transactions
+    description: Deposits, withdrawals, and transfers
+  - name: General Ledger
+    description: Double-entry accounting and trial balance
+  - name: Compliance
+    description: AML alerts and regulatory monitoring
+  - name: Interest
+    description: Interest accrual and posting
+  - name: Health
+    description: Service health and readiness checks
+
+paths:
+  # ── Accounts ───────────────────────────────────────────────────────────
+  /api/v1/accounts:
+    post:
+      operationId: createAccount
+      summary: Create a new bank account
+      tags: [Accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountRequest"
+            example:
+              customerID: "cust_01HQ3ZFJG4N5XYZ"
+              accountType: "DDA"
+              currency: "UGX"
+              dailyLimit: "5000000"
+      responses:
+        "201":
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAccountResponse"
+              example:
+                id: "acc_01HQ3ZFJG4N5ABC"
+                accountNumber: "1000000001"
+                status: "ACTIVE"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/accounts/{id}:
+    get:
+      operationId: getAccount
+      summary: Get account details
+      tags: [Accounts]
+      parameters:
+        - $ref: "#/components/parameters/AccountID"
+      responses:
+        "200":
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/accounts/{id}/balance:
+    get:
+      operationId: getAccountBalance
+      summary: Get account balance
+      tags: [Accounts]
+      parameters:
+        - $ref: "#/components/parameters/AccountID"
+      responses:
+        "200":
+          description: Account balance details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountBalanceResponse"
+              example:
+                accountID: "acc_01HQ3ZFJG4N5ABC"
+                accountNumber: "1000000001"
+                availableBalance: "1500000.00"
+                currentBalance: "1600000.00"
+                holdAmount: "100000.00"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/accounts/{id}/freeze:
+    post:
+      operationId: freezeAccount
+      summary: Freeze an account
+      description: Prevents all debit transactions on the account.
+      tags: [Accounts]
+      parameters:
+        - $ref: "#/components/parameters/AccountID"
+      responses:
+        "200":
+          description: Account frozen successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/accounts/{id}/close:
+    post:
+      operationId: closeAccount
+      summary: Close an account
+      description: Permanently closes the account. Account must have a zero balance.
+      tags: [Accounts]
+      parameters:
+        - $ref: "#/components/parameters/AccountID"
+      responses:
+        "200":
+          description: Account closed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Transactions ───────────────────────────────────────────────────────
+  /api/v1/transactions/deposit:
+    post:
+      operationId: deposit
+      summary: Deposit funds into an account
+      tags: [Transactions]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositRequest"
+            example:
+              accountID: "acc_01HQ3ZFJG4N5ABC"
+              amount: "500000"
+              currency: "UGX"
+              description: "Cash deposit"
+              idempotencyKey: "dep_01HQ3ZFJG4N5XYZ"
+      responses:
+        "201":
+          description: Deposit processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/transactions/withdraw:
+    post:
+      operationId: withdraw
+      summary: Withdraw funds from an account
+      tags: [Transactions]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalRequest"
+            example:
+              accountID: "acc_01HQ3ZFJG4N5ABC"
+              amount: "100000"
+              currency: "UGX"
+              description: "ATM withdrawal"
+              idempotencyKey: "wdr_01HQ3ZFJG4N5XYZ"
+      responses:
+        "201":
+          description: Withdrawal processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/transactions/transfer:
+    post:
+      operationId: transfer
+      summary: Transfer funds between accounts
+      tags: [Transactions]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferRequest"
+            example:
+              fromAccountID: "acc_01HQ3ZFJG4N5ABC"
+              toAccountID: "acc_01HQ3ZFJG4N5DEF"
+              amount: "250000"
+              currency: "UGX"
+              description: "Internal transfer"
+              idempotencyKey: "txf_01HQ3ZFJG4N5XYZ"
+      responses:
+        "201":
+          description: Transfer processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/transactions/{id}:
+    get:
+      operationId: getTransaction
+      summary: Get transaction details
+      tags: [Transactions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Transaction ID
+          schema:
+            type: string
+          example: "txn_01HQ3ZFJG4N5ABC"
+      responses:
+        "200":
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/accounts/{id}/statement:
+    get:
+      operationId: getStatement
+      summary: Get account statement
+      description: Returns paginated transaction history for the account within a date range.
+      tags: [Transactions]
+      parameters:
+        - $ref: "#/components/parameters/AccountID"
+        - name: from
+          in: query
+          required: false
+          description: Start date (inclusive, ISO 8601)
+          schema:
+            type: string
+            format: date
+          example: "2024-01-01"
+        - name: to
+          in: query
+          required: false
+          description: End date (inclusive, ISO 8601)
+          schema:
+            type: string
+            format: date
+          example: "2024-12-31"
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        - name: size
+          in: query
+          required: false
+          description: Number of records per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+      responses:
+        "200":
+          description: Account statement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatementResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── General Ledger ─────────────────────────────────────────────────────
+  /api/v1/gl/journal-entries:
+    post:
+      operationId: postJournalEntry
+      summary: Post a journal entry
+      description: Creates a balanced double-entry journal entry.
+      tags: [General Ledger]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostJournalEntryRequest"
+            example:
+              referenceNumber: "JE-2024-0001"
+              description: "Loan disbursement"
+              postedBy: "system"
+              fiscalPeriod: "2024-01"
+              idempotencyKey: "je_01HQ3ZFJG4N5XYZ"
+              entries:
+                - glAccountID: "gl_assets_loans"
+                  amount: "1000000"
+                  entryType: "DEBIT"
+                  effectiveDate: "2024-01-15"
+                - glAccountID: "gl_assets_cash"
+                  amount: "1000000"
+                  entryType: "CREDIT"
+                  effectiveDate: "2024-01-15"
+      responses:
+        "201":
+          description: Journal entry posted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/gl/trial-balance:
+    get:
+      operationId: getTrialBalance
+      summary: Get trial balance
+      description: Returns the current trial balance across all GL accounts.
+      tags: [General Ledger]
+      responses:
+        "200":
+          description: Trial balance
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GLBalanceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/gl/accounts:
+    get:
+      operationId: listGLAccounts
+      summary: List GL accounts
+      description: Returns all general ledger accounts in the chart of accounts.
+      tags: [General Ledger]
+      responses:
+        "200":
+          description: List of GL accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GLAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Compliance ─────────────────────────────────────────────────────────
+  /api/v1/compliance/alerts:
+    get:
+      operationId: listAMLAlerts
+      summary: List AML alerts
+      description: Returns compliance alerts, optionally filtered by status.
+      tags: [Compliance]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter alerts by status
+          schema:
+            type: string
+            enum: [OPEN, INVESTIGATING, ESCALATED, CLOSED, FILED]
+          example: "OPEN"
+      responses:
+        "200":
+          description: List of AML alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AMLAlert"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/compliance/alerts/{id}:
+    put:
+      operationId: updateAMLAlert
+      summary: Update an AML alert
+      description: Update the status or assignment of an AML alert.
+      tags: [Compliance]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Alert ID
+          schema:
+            type: string
+          example: "alert_01HQ3ZFJG4N5ABC"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAlertRequest"
+            example:
+              status: "INVESTIGATING"
+              assignedTo: "analyst_01"
+      responses:
+        "200":
+          description: Alert updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AMLAlert"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Interest ───────────────────────────────────────────────────────────
+  /api/v1/interest/accrue:
+    post:
+      operationId: accrueInterest
+      summary: Trigger daily interest accrual
+      description: Calculates and records daily interest accrual for all eligible accounts.
+      tags: [Interest]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccrueRequest"
+            example:
+              date: "2024-01-15"
+      responses:
+        "200":
+          description: Interest accrued successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccrualResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/interest/post:
+    post:
+      operationId: postAccruedInterest
+      summary: Post accrued interest
+      description: Posts all accrued but unposted interest to the respective accounts.
+      tags: [Interest]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostInterestRequest"
+            example:
+              throughDate: "2024-01-31"
+      responses:
+        "200":
+          description: Interest posted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostInterestResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Health ─────────────────────────────────────────────────────────────
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      description: Returns service health status.
+      tags: [Health]
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: "healthy"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /ready:
+    get:
+      operationId: readinessCheck
+      summary: Readiness check
+      description: Returns whether the service is ready to accept traffic (database and Redis connectivity).
+      tags: [Health]
+      security: []
+      responses:
+        "200":
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+              example:
+                status: "ready"
+                database: "ok"
+                redis: "ok"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  # ── Security Schemes ───────────────────────────────────────────────────
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT-based authentication for user-facing requests
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key authentication for service-to-service calls
+
+  # ── Parameters ─────────────────────────────────────────────────────────
+  parameters:
+    AccountID:
+      name: id
+      in: path
+      required: true
+      description: Account ID
+      schema:
+        type: string
+      example: "acc_01HQ3ZFJG4N5ABC"
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Unique key to ensure idempotent request processing
+      schema:
+        type: string
+        format: uuid
+      example: "550e8400-e29b-41d4-a716-446655440000"
+
+  # ── Responses ──────────────────────────────────────────────────────────
+  responses:
+    BadRequest:
+      description: Invalid request parameters or body
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "invalid account type"
+            code: "INVALID_INPUT"
+    Unauthorized:
+      description: Missing or invalid authentication credentials
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "missing or invalid token"
+            code: "UNAUTHORIZED"
+    NotFound:
+      description: Requested resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "account not found"
+            code: "NOT_FOUND"
+    Conflict:
+      description: Business rule violation or duplicate request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "account already frozen"
+            code: "CONFLICT"
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "rate limit exceeded"
+            code: "RATE_LIMITED"
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "internal server error"
+            code: "INTERNAL_ERROR"
+
+  # ── Schemas ────────────────────────────────────────────────────────────
+  schemas:
+    # ── Error ──────────────────────────────────────────────────────────
+    Error:
+      type: object
+      required: [error, code]
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Machine-readable error code
+
+    # ── Accounts ───────────────────────────────────────────────────────
+    CreateAccountRequest:
+      type: object
+      required: [customerID, accountType, currency, dailyLimit]
+      properties:
+        customerID:
+          type: string
+          description: ID of the customer who owns the account
+          example: "cust_01HQ3ZFJG4N5XYZ"
+        accountType:
+          type: string
+          enum: [DDA, SAVINGS, LOAN]
+          description: Type of bank account
+          example: "DDA"
+        currency:
+          type: string
+          description: ISO 4217 currency code
+          example: "UGX"
+        dailyLimit:
+          type: string
+          description: Maximum daily transaction limit (string to avoid floating-point)
+          example: "5000000"
+
+    CreateAccountResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique account identifier
+          example: "acc_01HQ3ZFJG4N5ABC"
+        accountNumber:
+          type: string
+          description: Human-readable account number
+          example: "1000000001"
+        status:
+          type: string
+          enum: [ACTIVE, FROZEN, CLOSED, DORMANT]
+          description: Current account status
+          example: "ACTIVE"
+
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "acc_01HQ3ZFJG4N5ABC"
+        accountNumber:
+          type: string
+          example: "1000000001"
+        customerID:
+          type: string
+          example: "cust_01HQ3ZFJG4N5XYZ"
+        accountType:
+          type: string
+          enum: [DDA, SAVINGS, LOAN]
+          example: "DDA"
+        currency:
+          type: string
+          example: "UGX"
+        status:
+          type: string
+          enum: [ACTIVE, FROZEN, CLOSED, DORMANT]
+          example: "ACTIVE"
+        dailyLimit:
+          type: string
+          description: Maximum daily transaction limit
+          example: "5000000"
+        version:
+          type: integer
+          description: Optimistic locking version
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T09:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T09:30:00Z"
+
+    AccountBalanceResponse:
+      type: object
+      properties:
+        accountID:
+          type: string
+          description: Account identifier
+          example: "acc_01HQ3ZFJG4N5ABC"
+        accountNumber:
+          type: string
+          description: Human-readable account number
+          example: "1000000001"
+        availableBalance:
+          type: string
+          description: Balance available for withdrawal (current minus holds)
+          example: "1500000.00"
+        currentBalance:
+          type: string
+          description: Total current balance including holds
+          example: "1600000.00"
+        holdAmount:
+          type: string
+          description: Total amount on hold
+          example: "100000.00"
+
+    # ── Transactions ───────────────────────────────────────────────────
+    DepositRequest:
+      type: object
+      required: [accountID, amount, currency, description, idempotencyKey]
+      properties:
+        accountID:
+          type: string
+          description: Target account ID
+          example: "acc_01HQ3ZFJG4N5ABC"
+        amount:
+          type: string
+          description: Deposit amount (string to avoid floating-point)
+          example: "500000"
+        currency:
+          type: string
+          description: ISO 4217 currency code
+          example: "UGX"
+        description:
+          type: string
+          description: Transaction description
+          example: "Cash deposit"
+        idempotencyKey:
+          type: string
+          description: Unique key for idempotent processing
+          example: "dep_01HQ3ZFJG4N5XYZ"
+
+    WithdrawalRequest:
+      type: object
+      required: [accountID, amount, currency, description, idempotencyKey]
+      properties:
+        accountID:
+          type: string
+          description: Source account ID
+          example: "acc_01HQ3ZFJG4N5ABC"
+        amount:
+          type: string
+          description: Withdrawal amount (string to avoid floating-point)
+          example: "100000"
+        currency:
+          type: string
+          description: ISO 4217 currency code
+          example: "UGX"
+        description:
+          type: string
+          description: Transaction description
+          example: "ATM withdrawal"
+        idempotencyKey:
+          type: string
+          description: Unique key for idempotent processing
+          example: "wdr_01HQ3ZFJG4N5XYZ"
+
+    TransferRequest:
+      type: object
+      required: [fromAccountID, toAccountID, amount, currency, description, idempotencyKey]
+      properties:
+        fromAccountID:
+          type: string
+          description: Source account ID
+          example: "acc_01HQ3ZFJG4N5ABC"
+        toAccountID:
+          type: string
+          description: Destination account ID
+          example: "acc_01HQ3ZFJG4N5DEF"
+        amount:
+          type: string
+          description: Transfer amount (string to avoid floating-point)
+          example: "250000"
+        currency:
+          type: string
+          description: ISO 4217 currency code
+          example: "UGX"
+        description:
+          type: string
+          description: Transaction description
+          example: "Internal transfer"
+        idempotencyKey:
+          type: string
+          description: Unique key for idempotent processing
+          example: "txf_01HQ3ZFJG4N5XYZ"
+
+    TransactionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Transaction identifier
+          example: "txn_01HQ3ZFJG4N5ABC"
+        referenceNumber:
+          type: string
+          description: Human-readable reference number
+          example: "TXN-20240115-0001"
+        status:
+          type: string
+          enum: [PENDING, SETTLED, FAILED, REVERSED]
+          description: Current transaction status
+          example: "SETTLED"
+        type:
+          type: string
+          enum: [DEPOSIT, WITHDRAWAL, TRANSFER, FEE, INTEREST, REVERSAL]
+          description: Transaction type
+          example: "DEPOSIT"
+        entries:
+          type: array
+          description: Double-entry ledger entries for this transaction
+          items:
+            $ref: "#/components/schemas/EntryResponse"
+
+    EntryResponse:
+      type: object
+      properties:
+        accountID:
+          type: string
+          description: Account that was debited or credited
+          example: "acc_01HQ3ZFJG4N5ABC"
+        entryType:
+          type: string
+          enum: [DEBIT, CREDIT]
+          description: Entry type
+          example: "CREDIT"
+        amount:
+          type: string
+          description: Entry amount
+          example: "500000"
+        runningBalance:
+          type: string
+          description: Account balance after this entry
+          example: "1500000.00"
+        currency:
+          type: string
+          description: ISO 4217 currency code
+          example: "UGX"
+
+    StatementResponse:
+      type: object
+      properties:
+        accountID:
+          type: string
+          example: "acc_01HQ3ZFJG4N5ABC"
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionResponse"
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        size:
+          type: integer
+          description: Number of records per page
+          example: 20
+        totalRecords:
+          type: integer
+          description: Total number of matching transactions
+          example: 150
+
+    # ── General Ledger ─────────────────────────────────────────────────
+    PostJournalEntryRequest:
+      type: object
+      required: [referenceNumber, description, postedBy, fiscalPeriod, idempotencyKey, entries]
+      properties:
+        referenceNumber:
+          type: string
+          description: Unique journal entry reference
+          example: "JE-2024-0001"
+        description:
+          type: string
+          description: Description of the journal entry
+          example: "Loan disbursement"
+        postedBy:
+          type: string
+          description: User or system that posted the entry
+          example: "system"
+        fiscalPeriod:
+          type: string
+          description: Fiscal period (YYYY-MM)
+          example: "2024-01"
+        idempotencyKey:
+          type: string
+          description: Unique key for idempotent processing
+          example: "je_01HQ3ZFJG4N5XYZ"
+        entries:
+          type: array
+          description: Balanced set of debit and credit entries
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/GLEntryRequest"
+
+    GLEntryRequest:
+      type: object
+      required: [glAccountID, amount, entryType, effectiveDate]
+      properties:
+        glAccountID:
+          type: string
+          description: GL account identifier
+          example: "gl_assets_loans"
+        amount:
+          type: string
+          description: Entry amount (string to avoid floating-point)
+          example: "1000000"
+        entryType:
+          type: string
+          enum: [DEBIT, CREDIT]
+          description: Entry type
+          example: "DEBIT"
+        effectiveDate:
+          type: string
+          format: date
+          description: Effective date of the entry
+          example: "2024-01-15"
+
+    JournalEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "je_01HQ3ZFJG4N5ABC"
+        referenceNumber:
+          type: string
+          example: "JE-2024-0001"
+        description:
+          type: string
+          example: "Loan disbursement"
+        postedBy:
+          type: string
+          example: "system"
+        fiscalPeriod:
+          type: string
+          example: "2024-01"
+        idempotencyKey:
+          type: string
+          example: "je_01HQ3ZFJG4N5XYZ"
+        postedAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:00:00Z"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/GLEntry"
+
+    GLEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "gle_01HQ3ZFJG4N5ABC"
+        journalEntryID:
+          type: string
+          example: "je_01HQ3ZFJG4N5ABC"
+        glAccountID:
+          type: string
+          example: "gl_assets_loans"
+        amount:
+          type: string
+          description: Entry amount
+          example: "1000000"
+        entryType:
+          type: string
+          enum: [DEBIT, CREDIT]
+          example: "DEBIT"
+        effectiveDate:
+          type: string
+          format: date
+          example: "2024-01-15"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:00:00Z"
+
+    GLAccount:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "gl_assets_cash"
+        code:
+          type: string
+          description: GL account code
+          example: "1001"
+        name:
+          type: string
+          description: GL account name
+          example: "Cash and Equivalents"
+        accountClass:
+          type: string
+          enum: [ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE]
+          description: Accounting classification
+          example: "ASSET"
+        normalBalance:
+          type: string
+          enum: [DEBIT, CREDIT]
+          description: Normal balance side for this account class
+          example: "DEBIT"
+        parentID:
+          type: string
+          nullable: true
+          description: Parent GL account ID (for hierarchical chart of accounts)
+          example: "gl_assets"
+        isActive:
+          type: boolean
+          description: Whether the account is active
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-01T00:00:00Z"
+
+    GLBalanceResponse:
+      type: object
+      properties:
+        glAccountID:
+          type: string
+          example: "gl_assets_cash"
+        code:
+          type: string
+          example: "1001"
+        name:
+          type: string
+          example: "Cash and Equivalents"
+        balance:
+          type: string
+          description: Current balance (string to avoid floating-point)
+          example: "15000000.00"
+        accountClass:
+          type: string
+          enum: [ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE]
+          example: "ASSET"
+
+    # ── Compliance ─────────────────────────────────────────────────────
+    AMLAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "alert_01HQ3ZFJG4N5ABC"
+        accountID:
+          type: string
+          example: "acc_01HQ3ZFJG4N5ABC"
+        alertType:
+          type: string
+          enum: [CTR, SAR, VELOCITY, STRUCTURING]
+          description: Type of AML alert
+          example: "VELOCITY"
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          description: Alert severity level
+          example: "HIGH"
+        transactionIDs:
+          type: array
+          items:
+            type: string
+          description: Transactions that triggered this alert
+          example: ["txn_001", "txn_002"]
+        totalAmount:
+          type: string
+          description: Aggregate amount that triggered the alert
+          example: "12000000"
+        status:
+          type: string
+          enum: [OPEN, INVESTIGATING, ESCALATED, CLOSED, FILED]
+          description: Current alert status
+          example: "OPEN"
+        assignedTo:
+          type: string
+          nullable: true
+          description: Analyst assigned to this alert
+          example: "analyst_01"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T14:30:00Z"
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the alert was resolved
+          example: null
+
+    UpdateAlertRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [OPEN, INVESTIGATING, ESCALATED, CLOSED, FILED]
+          description: New alert status
+          example: "INVESTIGATING"
+        assignedTo:
+          type: string
+          description: Analyst to assign the alert to
+          example: "analyst_01"
+
+    # ── Interest ───────────────────────────────────────────────────────
+    AccrueRequest:
+      type: object
+      required: [date]
+      properties:
+        date:
+          type: string
+          format: date
+          description: Accrual date (YYYY-MM-DD)
+          example: "2024-01-15"
+
+    AccrualResponse:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: Accrual date processed
+          example: "2024-01-15"
+        accountsProcessed:
+          type: integer
+          description: Number of accounts that had interest accrued
+          example: 1250
+        totalAccrued:
+          type: string
+          description: Total interest accrued across all accounts
+          example: "3450000.00"
+
+    PostInterestRequest:
+      type: object
+      required: [throughDate]
+      properties:
+        throughDate:
+          type: string
+          format: date
+          description: Post all accrued interest through this date (YYYY-MM-DD)
+          example: "2024-01-31"
+
+    PostInterestResponse:
+      type: object
+      properties:
+        throughDate:
+          type: string
+          format: date
+          description: Date through which interest was posted
+          example: "2024-01-31"
+        accountsProcessed:
+          type: integer
+          description: Number of accounts that had interest posted
+          example: 1250
+        totalPosted:
+          type: string
+          description: Total interest posted
+          example: "105000000.00"
+
+    # ── Health ─────────────────────────────────────────────────────────
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Service health status
+          example: "healthy"
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Overall readiness status
+          example: "ready"
+        database:
+          type: string
+          description: Database connectivity status
+          example: "ok"
+        redis:
+          type: string
+          description: Redis connectivity status
+          example: "ok"
