@@ -15,7 +15,7 @@ services:
       KAFKA_BROKERS: "kafka:9092"
       OTEL_EXPORTER_ENDPOINT: "otel-collector:4317"
       RATE_LIMIT_REQUESTS: "100"
-      RATE_LIMIT_WINDOW_SECS: "60"
+      RATE_LIMIT_WINDOW_SEC: "60"
     depends_on:
       postgres:
         condition: service_healthy
