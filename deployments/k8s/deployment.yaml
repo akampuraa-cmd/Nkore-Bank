@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nkorebank
+  namespace: nkore-bank
+  labels:
+    app: nkorebank
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nkorebank
+  template:
+    metadata:
+      labels:
+        app: nkorebank
+    spec:
+      serviceAccountName: nkorebank
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: nkorebank
+          image: nkore-bank:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: nkorebank-secrets
+            - configMapRef:
+                name: nkorebank-config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nkore-bank
+  labels:
+    app.kubernetes.io/name: nkore-bank
+    app.kubernetes.io/part-of: nkore-bank-platform
